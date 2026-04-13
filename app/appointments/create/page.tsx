@@ -157,71 +157,59 @@ export default function CreatePage() {
       </div>
 
       <div className="space-y-8">
-        {/* Q1: Select Calendar */}
+        {/* Q1: Select Calendar + Q2: Appointment Types */}
         <section className="bg-white border border-gray-200 rounded-lg p-6">
           <div className="flex items-start gap-3 mb-4">
             <SectionNumber n={1} />
             <div>
-              <h2 className="text-base font-semibold text-gray-900">Which calendar is this for?</h2>
+              <h2 className="text-base font-semibold text-gray-900">Details</h2>
             </div>
           </div>
-          <div className="ml-11 space-y-3">
-            {CALENDARS.map(cal => (
-              <label
-                key={cal.id}
-                className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
-                  calendarId === cal.id ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="calendar"
-                  value={cal.id}
-                  checked={calendarId === cal.id}
-                  onChange={() => { setCalendarId(cal.id); setAppointmentTypes([]); }}
-                  className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                />
-                <span className="text-sm text-gray-700">{cal.name}</span>
-              </label>
-            ))}
+          <div className="ml-11 space-y-5">
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium text-gray-700">Select Calendar Account</label>
+              <div className="relative">
+                <select
+                  value={calendarId}
+                  onChange={e => { setCalendarId(e.target.value); setAppointmentTypes([]); }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="" disabled>Choose a calendar account</option>
+                  {CALENDARS.map(cal => (
+                    <option key={cal.id} value={cal.id}>{cal.name}</option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                  <svg className="h-4 w-4 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {calendarId && (
+              <TagInput
+                label="Which appointment types will this apply to?"
+                options={[
+                  { value: '__all__', label: 'All appointments' },
+                  ...(selectedCalendar?.appointmentTypes.map(t => ({ value: t, label: t })) || []),
+                ]}
+                selected={appointmentTypes}
+                onChange={setAppointmentTypes}
+                placeholder="All appointments"
+              />
+            )}
           </div>
         </section>
 
-        {/* Q2: Select Appointment Types */}
+        {/* Q3: How should patients book? */}
         {calendarId && (
           <section className="bg-white border border-gray-200 rounded-lg p-6">
             <div className="flex items-start gap-3 mb-1">
               <SectionNumber n={2} />
               <div>
-                <h2 className="text-base font-semibold text-gray-900">Which appointment type(s) do these rules apply to?</h2>
-                <p className="text-sm text-gray-500 mt-0.5">Calendar: {selectedCalendar?.name}</p>
-              </div>
-            </div>
-            <div className="ml-11 space-y-2 mt-4">
-              {selectedCalendar?.appointmentTypes.map(type => (
-                <Checkbox
-                  key={type}
-                  label={type}
-                  checked={appointmentTypes.includes(type)}
-                  onChange={checked => {
-                    setAppointmentTypes(prev =>
-                      checked ? [...prev, type] : prev.filter(t => t !== type)
-                    );
-                  }}
-                />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Q3: How should patients book? */}
-        {appointmentTypes.length > 0 && (
-          <section className="bg-white border border-gray-200 rounded-lg p-6">
-            <div className="flex items-start gap-3 mb-1">
-              <SectionNumber n={3} />
-              <div>
                 <h2 className="text-base font-semibold text-gray-900">How would you like patients to book?</h2>
-                <p className="text-sm text-gray-500 mt-0.5">{selectedCalendar?.name} &middot; {appointmentTypes.join(', ')}</p>
+                <p className="text-sm text-gray-500 mt-0.5">{selectedCalendar?.name}{appointmentTypes.length > 0 ? ` \u00B7 ${appointmentTypes.join(', ')}` : ''}</p>
               </div>
             </div>
             <div className="ml-11 space-y-3 mt-4">
@@ -279,10 +267,10 @@ export default function CreatePage() {
         )}
 
         {/* Q4: What information to collect? */}
-        {appointmentTypes.length > 0 && (
+        {calendarId && (
           <section className="bg-white border border-gray-200 rounded-lg p-6">
             <div className="flex items-start gap-3 mb-1">
-              <SectionNumber n={4} />
+              <SectionNumber n={3} />
               <div>
                 <h2 className="text-base font-semibold text-gray-900">What information do we need to collect from the patient?</h2>
               </div>
@@ -372,10 +360,10 @@ export default function CreatePage() {
         )}
 
         {/* Q5: Handover rules */}
-        {appointmentTypes.length > 0 && (
+        {calendarId && (
           <section className="bg-white border border-gray-200 rounded-lg p-6">
             <div className="flex items-start gap-3 mb-1">
-              <SectionNumber n={5} />
+              <SectionNumber n={4} />
               <div>
                 <h2 className="text-base font-semibold text-gray-900">Are there any situations where we should handover to a human agent?</h2>
               </div>
@@ -453,10 +441,10 @@ export default function CreatePage() {
         )}
 
         {/* Q6: Alerts */}
-        {appointmentTypes.length > 0 && (
+        {calendarId && (
           <section className="bg-white border border-gray-200 rounded-lg p-6">
             <div className="flex items-start gap-3 mb-1">
-              <SectionNumber n={6} />
+              <SectionNumber n={5} />
               <div>
                 <h2 className="text-base font-semibold text-gray-900">Who should we alert when a patient books?</h2>
               </div>
@@ -566,12 +554,12 @@ export default function CreatePage() {
         )}
 
         {/* Actions */}
-        {appointmentTypes.length > 0 && (
+        {calendarId && (
           <div className="flex items-center justify-end gap-3 pb-8">
             <Button variant="outline" onClick={() => handleSave('draft')}>
               Save Draft
             </Button>
-            <Button onClick={() => handleSave('active')} disabled={!calendarId || appointmentTypes.length === 0}>
+            <Button onClick={() => handleSave('active')} disabled={!calendarId}>
               Activate {'\u2713'}
             </Button>
           </div>
