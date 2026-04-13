@@ -9,6 +9,9 @@ export const MOCK_RULES: SchedulingRule[] = [
     calendarId: 'radiology',
     calendarName: 'Radiology Department',
     appointmentTypes: ['MRI Exam', 'CT Scan'],
+    description: 'This MRI/CT scan appointment is for patients who have been referred by their doctor. Patients must submit their referral letter in chat to book their appointment. Patients without a referral letter will be handed over to a human agent.',
+    eligibility: 'criteria',
+    eligibilityCriteria: ['Patient must have a doctor referral', 'Patient must submit referral letter in chat'],
     bookingMethod: 'request',
     preferredSlotsCount: 3,
     fields: [
@@ -41,6 +44,9 @@ export const MOCK_RULES: SchedulingRule[] = [
     calendarId: 'wellness',
     calendarName: 'Wellness Center',
     appointmentTypes: ['Health Screening', 'Executive Checkup'],
+    description: 'Wellness screening packages for general health assessment. Patients should fast for 12 hours before blood work.',
+    eligibility: 'anyone',
+    eligibilityCriteria: [],
     bookingMethod: 'direct',
     fields: [
       { propertyId: 'full_name', label: 'Full Name', required: true },
@@ -69,6 +75,9 @@ export const MOCK_RULES: SchedulingRule[] = [
     calendarId: 'dr_smith',
     calendarName: 'Dr. Smith - Cardiology',
     appointmentTypes: ['Consultation'],
+    description: 'Cardiology consultation with Dr. Smith. Available Mon-Fri 9am-5pm.',
+    eligibility: 'anyone',
+    eligibilityCriteria: [],
     bookingMethod: 'link',
     schedulingLink: 'https://clinic.calendly.com/dr-smith',
     fields: [

@@ -24,9 +24,14 @@ export default function CreatePage() {
 
   // Q1
   const [calendarId, setCalendarId] = useState('');
-  // Q2
   const [appointmentTypes, setAppointmentTypes] = useState<string[]>([]);
-  // Q3
+  // Q2: Description
+  const [description, setDescription] = useState('');
+  // Q3: Eligibility
+  const [eligibility, setEligibility] = useState<'anyone' | 'criteria'>('anyone');
+  const [eligibilityCriteria, setEligibilityCriteria] = useState<string[]>([]);
+  const [newCriterion, setNewCriterion] = useState('');
+  // Q4
   const [bookingMethod, setBookingMethod] = useState<BookingMethod>('request');
   const [schedulingLink, setSchedulingLink] = useState('');
   const [preferredSlotsCount, setPreferredSlotsCount] = useState(3);
@@ -124,6 +129,9 @@ export default function CreatePage() {
       calendarId,
       calendarName: selectedCalendar?.name || '',
       appointmentTypes,
+      description,
+      eligibility,
+      eligibilityCriteria: eligibility === 'criteria' ? eligibilityCriteria : [],
       bookingMethod,
       schedulingLink: bookingMethod === 'link' ? schedulingLink : undefined,
       preferredSlotsCount: bookingMethod === 'request' ? preferredSlotsCount : undefined,
@@ -202,11 +210,128 @@ export default function CreatePage() {
           </div>
         </section>
 
-        {/* Q3: How should patients book? */}
+        {/* Q2: Describe this appointment */}
         {calendarId && (
           <section className="bg-white border border-gray-200 rounded-lg p-6">
             <div className="flex items-start gap-3 mb-1">
               <SectionNumber n={2} />
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">Describe this appointment</h2>
+                <p className="text-sm text-gray-500 mt-0.5">Helps the AI understand context and handle patient questions</p>
+              </div>
+            </div>
+            <div className="ml-11 mt-4">
+              <textarea
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                placeholder="e.g. This MRI/CT scan appointment is for patients who have been referred by their doctor. Patients must submit their referral letter in chat to book their appointment. Patients without a referral letter will be handed over to a human agent."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y min-h-[100px]"
+              />
+              <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1">
+                <span>{'\u{1F4A1}'}</span> Write like you&apos;re briefing a new receptionist
+              </p>
+            </div>
+          </section>
+        )}
+
+        {/* Q3: Who can book? */}
+        {calendarId && (
+          <section className="bg-white border border-gray-200 rounded-lg p-6">
+            <div className="flex items-start gap-3 mb-1">
+              <SectionNumber n={3} />
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">Who can book this appointment?</h2>
+              </div>
+            </div>
+            <div className="ml-11 mt-4 space-y-3">
+              <label
+                className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+                  eligibility === 'anyone' ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="eligibility"
+                  checked={eligibility === 'anyone'}
+                  onChange={() => setEligibility('anyone')}
+                  className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-700">Anyone</span>
+              </label>
+
+              <label
+                className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+                  eligibility === 'criteria' ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="eligibility"
+                  checked={eligibility === 'criteria'}
+                  onChange={() => setEligibility('criteria')}
+                  className="mt-0.5 w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-700">Patients who meet these criteria:</span>
+              </label>
+
+              {eligibility === 'criteria' && (
+                <div className="space-y-2 pl-2">
+                  {eligibilityCriteria.map((criterion, index) => (
+                    <div key={index} className="flex items-center gap-2 p-2.5 bg-gray-50 rounded-lg">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />
+                      <span className="text-sm text-gray-700 flex-1">{criterion}</span>
+                      <button
+                        onClick={() => setEligibilityCriteria(prev => prev.filter((_, i) => i !== index))}
+                        className="text-gray-400 hover:text-red-500 flex-shrink-0"
+                      >
+                        <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={newCriterion}
+                      onChange={e => setNewCriterion(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && newCriterion.trim()) {
+                          e.preventDefault();
+                          setEligibilityCriteria(prev => [...prev, newCriterion.trim()]);
+                          setNewCriterion('');
+                        }
+                      }}
+                      placeholder="e.g. Patient must have a doctor referral"
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <Button
+                      size="sm"
+                      disabled={!newCriterion.trim()}
+                      onClick={() => {
+                        if (newCriterion.trim()) {
+                          setEligibilityCriteria(prev => [...prev, newCriterion.trim()]);
+                          setNewCriterion('');
+                        }
+                      }}
+                    >
+                      Add
+                    </Button>
+                  </div>
+                  <p className="text-xs text-gray-400 flex items-center gap-1">
+                    <span>{'\u{1F4A1}'}</span> The AI will check these criteria during the conversation
+                  </p>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* Q4: How should patients book? */}
+        {calendarId && (
+          <section className="bg-white border border-gray-200 rounded-lg p-6">
+            <div className="flex items-start gap-3 mb-1">
+              <SectionNumber n={4} />
               <div>
                 <h2 className="text-base font-semibold text-gray-900">How would you like patients to book?</h2>
                 <p className="text-sm text-gray-500 mt-0.5">{selectedCalendar?.name}{appointmentTypes.length > 0 ? ` \u00B7 ${appointmentTypes.join(', ')}` : ''}</p>
@@ -270,7 +395,7 @@ export default function CreatePage() {
         {calendarId && (
           <section className="bg-white border border-gray-200 rounded-lg p-6">
             <div className="flex items-start gap-3 mb-1">
-              <SectionNumber n={3} />
+              <SectionNumber n={5} />
               <div>
                 <h2 className="text-base font-semibold text-gray-900">What information do we need to collect from the patient?</h2>
               </div>
@@ -363,7 +488,7 @@ export default function CreatePage() {
         {calendarId && (
           <section className="bg-white border border-gray-200 rounded-lg p-6">
             <div className="flex items-start gap-3 mb-1">
-              <SectionNumber n={4} />
+              <SectionNumber n={6} />
               <div>
                 <h2 className="text-base font-semibold text-gray-900">Are there any situations where we should handover to a human agent?</h2>
               </div>
@@ -444,7 +569,7 @@ export default function CreatePage() {
         {calendarId && (
           <section className="bg-white border border-gray-200 rounded-lg p-6">
             <div className="flex items-start gap-3 mb-1">
-              <SectionNumber n={5} />
+              <SectionNumber n={7} />
               <div>
                 <h2 className="text-base font-semibold text-gray-900">Who should we alert when a patient books?</h2>
               </div>

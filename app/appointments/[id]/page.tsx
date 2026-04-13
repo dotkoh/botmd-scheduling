@@ -84,10 +84,34 @@ export default function EditPage({ params }: PageProps) {
 
         <Section title="Appointment Types" icon={'\u{1F4CB}'}>
           <div className="flex flex-wrap gap-2">
-            {rule.appointmentTypes.map(t => (
+            {rule.appointmentTypes.length > 0 ? rule.appointmentTypes.map(t => (
               <span key={t} className="px-2.5 py-1 bg-gray-100 text-gray-700 rounded text-sm">{t}</span>
-            ))}
+            )) : <span className="text-sm text-gray-400">All appointments</span>}
           </div>
+        </Section>
+
+        {/* Description */}
+        {rule.description && (
+          <Section title="Description" icon={'\u{1F4DD}'}>
+            <p className="text-sm text-gray-700">{rule.description}</p>
+          </Section>
+        )}
+
+        {/* Eligibility */}
+        <Section title="Who Can Book" icon={'\u{1F464}'}>
+          {rule.eligibility === 'anyone' ? (
+            <p className="text-sm text-gray-700">Anyone can book this appointment</p>
+          ) : (
+            <div className="space-y-1.5">
+              <p className="text-sm text-gray-700 mb-2">Patients who meet these criteria:</p>
+              {rule.eligibilityCriteria.map((c, i) => (
+                <div key={i} className="flex items-center gap-2 text-sm text-gray-700">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />
+                  {c}
+                </div>
+              ))}
+            </div>
+          )}
         </Section>
 
         {/* Booking Method */}

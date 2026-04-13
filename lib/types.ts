@@ -53,10 +53,17 @@ export interface SchedulingRule {
   calendarId: string;
   calendarName: string;
 
-  // Q2: Appointment types
+  // Q1: Appointment types
   appointmentTypes: string[];
 
-  // Q3: Booking method
+  // Q2: Description
+  description: string;
+
+  // Q3: Eligibility
+  eligibility: 'anyone' | 'criteria';
+  eligibilityCriteria: string[];
+
+  // Q4: Booking method
   bookingMethod: BookingMethod;
   schedulingLink?: string;
   preferredSlotsCount?: number;
