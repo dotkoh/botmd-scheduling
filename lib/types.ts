@@ -12,70 +12,70 @@ export interface FieldConfig {
   required: boolean;
 }
 
-export interface CustomField {
-  id: string;
-  label: string;
-  type: 'text' | 'number' | 'yes_no' | 'select';
-  required: boolean;
-  options?: string[];
-}
-
 export type BookingMethod = 'direct' | 'link' | 'request';
 
-export interface HandoverRule {
-  id: string;
-  condition: string; // "is" | "requires" | "mentions" | "doesnt_know" | "has"
-  value: string;
-  label: string; // human-readable: "Handover if patient is an HMO patient"
-}
+export type IneligibleAction = 'handover' | 'inform_call';
+export type ReschedulePolicy = 'yes' | 'no_handover' | 'no_call';
+export type CancelPolicy = 'yes' | 'no_handover' | 'no_call';
+export type NoSlotsAction = 'handover' | 'inform';
+export type NoSuitableAction = 'offer_next' | 'handover';
 
-export interface AlertRecipient {
-  name: string;
-  email: string;
-  whatsapp: string;
-  viber: string;
-  sms: string;
+export interface DirectBookingConfig {
+  slotsToOffer: number;
+  advanceAmount: number;
+  advanceUnit: 'days' | 'weeks' | 'months';
+  noSlotsAction: NoSlotsAction;
+  noSuitableAction: NoSuitableAction;
+  maxRetries: number;
 }
 
 export interface AlertConfig {
   enabled: boolean;
-  recipients: AlertRecipient[];
+  alertUsers: string[];
   triggers: string[];
 }
 
 export interface SchedulingRule {
   id: string;
-  status: 'active' | 'paused' | 'draft';
+  status: 'active' | 'draft';
   createdAt: string;
   updatedAt: string;
 
-  // Q1: Calendar
+  // 1: Details
   calendarId: string;
   calendarName: string;
-
-  // Q1: Appointment types
   appointmentTypes: string[];
 
-  // Q2: Description
+  // 2: Description
   description: string;
 
-  // Q3: Eligibility
+  // 3: Eligibility
   eligibility: 'anyone' | 'criteria';
   eligibilityCriteria: string[];
+  ineligibleAction: IneligibleAction;
+  ineligibleCallNumber: string;
 
-  // Q4: Booking method
+  // 4: Booking method
   bookingMethod: BookingMethod;
-  schedulingLink?: string;
-  preferredSlotsCount?: number;
+  directConfig: DirectBookingConfig;
+  preferredSlotsCount: number;
 
-  // Q4: Information to collect
+  // 5: Information to collect
   fields: FieldConfig[];
-  customFields: CustomField[];
 
-  // Q5: Handover rules
-  handoverRules: HandoverRule[];
+  // 6: Reschedule policy
+  reschedulePolicy: ReschedulePolicy;
+  rescheduleAmount: number;
+  rescheduleUnit: 'hours' | 'days' | 'weeks' | 'months';
+  rescheduleCallNumber: string;
 
-  // Q6: Alerts
+  // 7: Cancel policy
+  cancelPolicy: CancelPolicy;
+  cancelAmount: number;
+  cancelUnit: 'hours' | 'days' | 'weeks' | 'months';
+  cancelCallNumber: string;
+
+  // 8: Alerts
   alerts: AlertConfig;
 }
 

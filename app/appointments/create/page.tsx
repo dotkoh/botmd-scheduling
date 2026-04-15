@@ -3,10 +3,13 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store';
-import { CALENDARS, CONTACT_PROPERTIES, BOOKING_METHODS, HANDOVER_CONDITIONS, HANDOVER_VALUES, ALERT_TRIGGERS } from '@/lib/constants';
-import { SchedulingRule, FieldConfig, CustomField, HandoverRule, BookingMethod, AlertRecipient } from '@/lib/types';
+import { CALENDARS, CONTACT_PROPERTIES, ADMIN_USERS, ALERT_TRIGGERS } from '@/lib/constants';
+import {
+  SchedulingRule, FieldConfig, BookingMethod,
+  IneligibleAction, ReschedulePolicy, CancelPolicy,
+  NoSlotsAction, NoSuitableAction, DirectBookingConfig,
+} from '@/lib/types';
 import Button from '@/components/ui/Button';
-import Input from '@/components/ui/Input';
 import Checkbox from '@/components/ui/Checkbox';
 import TagInput from '@/components/ui/TagInput';
 
@@ -18,39 +21,69 @@ function SectionNumber({ n }: { n: number }) {
   );
 }
 
+function StyledSelect({ value, onChange, children, className = '' }: {
+  value: string | number;
+  onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`relative inline-block ${className}`}>
+      <select
+        value={value}
+        onChange={onChange}
+        className="appearance-none pl-3 pr-8 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
+        {children}
+      </select>
+      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5">
+        <svg className="h-4 w-4 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
 export default function CreatePage() {
   const router = useRouter();
   const { addRule } = useStore();
 
-  // Q1
+  // 1: Details
   const [calendarId, setCalendarId] = useState('');
   const [appointmentTypes, setAppointmentTypes] = useState<string[]>([]);
-  // Q2: Description
+  // 2: Description
   const [description, setDescription] = useState('');
-  // Q3: Eligibility
+  const [isRewriting, setIsRewriting] = useState(false);
+  // 3: Eligibility
   const [eligibility, setEligibility] = useState<'anyone' | 'criteria'>('anyone');
   const [eligibilityCriteria, setEligibilityCriteria] = useState<string[]>([]);
   const [newCriterion, setNewCriterion] = useState('');
-  // Q4
-  const [bookingMethod, setBookingMethod] = useState<BookingMethod>('request');
-  const [schedulingLink, setSchedulingLink] = useState('');
+  const [ineligibleAction, setIneligibleAction] = useState<IneligibleAction>('handover');
+  const [ineligibleCallNumber, setIneligibleCallNumber] = useState('');
+  // 4: Booking method
+  const [bookingMethod, setBookingMethod] = useState<BookingMethod>('direct');
+  const [directConfig, setDirectConfig] = useState<DirectBookingConfig>({
+    slotsToOffer: 3, advanceAmount: 2, advanceUnit: 'weeks',
+    noSlotsAction: 'handover', noSuitableAction: 'offer_next', maxRetries: 3,
+  });
   const [preferredSlotsCount, setPreferredSlotsCount] = useState(3);
-  // Q4
+  // 5: Fields
   const [selectedFields, setSelectedFields] = useState<FieldConfig[]>([]);
-  const [customFields, setCustomFields] = useState<CustomField[]>([]);
-  const [showCustomField, setShowCustomField] = useState(false);
-  const [cfName, setCfName] = useState('');
-  const [cfType, setCfType] = useState<CustomField['type']>('text');
-  const [cfRequired, setCfRequired] = useState(false);
-  // Q5
-  const [handoverEnabled, setHandoverEnabled] = useState(true);
-  const [handoverRules, setHandoverRules] = useState<HandoverRule[]>([]);
-  // Q6
+  // 6: Reschedule
+  const [reschedulePolicy, setReschedulePolicy] = useState<ReschedulePolicy>('yes');
+  const [rescheduleAmount, setRescheduleAmount] = useState(24);
+  const [rescheduleUnit, setRescheduleUnit] = useState<'hours' | 'days' | 'weeks' | 'months'>('hours');
+  const [rescheduleCallNumber, setRescheduleCallNumber] = useState('');
+  // 7: Cancel
+  const [cancelPolicy, setCancelPolicy] = useState<CancelPolicy>('yes');
+  const [cancelAmount, setCancelAmount] = useState(24);
+  const [cancelUnit, setCancelUnit] = useState<'hours' | 'days' | 'weeks' | 'months'>('hours');
+  const [cancelCallNumber, setCancelCallNumber] = useState('');
+  // 8: Alerts
   const [alertEnabled, setAlertEnabled] = useState(true);
-  const [alertRecipients, setAlertRecipients] = useState<AlertRecipient[]>([
-    { name: '', email: '', whatsapp: '', viber: '', sms: '' },
-  ]);
-  const [alertTriggers, setAlertTriggers] = useState<string[]>(['new_booking', 'handover']);
+  const [alertUsers, setAlertUsers] = useState<string[]>([]);
+  const [alertTriggers, setAlertTriggers] = useState<string[]>(['new_booking', 'cancel_reschedule']);
 
   const selectedCalendar = CALENDARS.find(c => c.id === calendarId);
 
@@ -76,40 +109,15 @@ export default function CreatePage() {
     );
   }
 
-  function addCustomField() {
-    if (!cfName.trim()) return;
-    const id = cfName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
-    setCustomFields(prev => [...prev, { id, label: cfName.trim(), type: cfType, required: cfRequired }]);
-    setCfName('');
-    setCfType('text');
-    setCfRequired(false);
-    setShowCustomField(false);
-  }
-
-  function addHandoverRule() {
-    setHandoverRules(prev => [
-      ...prev,
-      { id: `hr_${Date.now()}`, condition: 'is', value: 'hmo_patient', label: '' },
-    ]);
-  }
-
-  function updateHandoverRule(id: string, updates: Partial<HandoverRule>) {
-    setHandoverRules(prev => prev.map(r => {
-      if (r.id !== id) return r;
-      const updated = { ...r, ...updates };
-      const condLabel = HANDOVER_CONDITIONS.find(c => c.value === updated.condition)?.label || updated.condition;
-      const valLabel = HANDOVER_VALUES[updated.condition]?.find(v => v.value === updated.value)?.label || updated.value;
-      updated.label = `Handover if patient ${condLabel} ${valLabel}`;
-      return updated;
-    }));
-  }
-
-  function removeHandoverRule(id: string) {
-    setHandoverRules(prev => prev.filter(r => r.id !== id));
-  }
-
-  function updateRecipient(index: number, updates: Partial<AlertRecipient>) {
-    setAlertRecipients(prev => prev.map((r, i) => (i === index ? { ...r, ...updates } : r)));
+  function handleRewrite() {
+    if (!description.trim()) return;
+    setIsRewriting(true);
+    setTimeout(() => {
+      const sentences = description.split(/[.!]\s*/g).filter(Boolean);
+      const rewritten = sentences.map(s => s.charAt(0).toUpperCase() + s.slice(1).trim()).join('. ') + '.';
+      setDescription(rewritten);
+      setIsRewriting(false);
+    }, 1200);
   }
 
   function toggleAlertTrigger(triggerId: string) {
@@ -118,12 +126,20 @@ export default function CreatePage() {
     );
   }
 
-  function handleSave(status: 'active' | 'draft') {
+  function getSubheader() {
+    const cal = selectedCalendar?.name || '';
+    const types = appointmentTypes.length > 0
+      ? appointmentTypes.map(t => t.includes('__all__') ? 'All Appointments' : t).join(', ')
+      : 'All Appointments';
+    return `${cal} | ${types}`;
+  }
+
+  function handleSave() {
     const id = `rule_${Date.now()}`;
     const now = new Date().toISOString();
     const rule: SchedulingRule = {
       id,
-      status,
+      status: 'active',
       createdAt: now,
       updatedAt: now,
       calendarId,
@@ -132,15 +148,23 @@ export default function CreatePage() {
       description,
       eligibility,
       eligibilityCriteria: eligibility === 'criteria' ? eligibilityCriteria : [],
+      ineligibleAction: eligibility === 'criteria' ? ineligibleAction : 'handover',
+      ineligibleCallNumber: ineligibleAction === 'inform_call' ? ineligibleCallNumber : '',
       bookingMethod,
-      schedulingLink: bookingMethod === 'link' ? schedulingLink : undefined,
-      preferredSlotsCount: bookingMethod === 'request' ? preferredSlotsCount : undefined,
+      directConfig,
+      preferredSlotsCount,
       fields: selectedFields,
-      customFields,
-      handoverRules: handoverEnabled ? handoverRules : [],
+      reschedulePolicy,
+      rescheduleAmount: reschedulePolicy === 'yes' ? rescheduleAmount : 0,
+      rescheduleUnit,
+      rescheduleCallNumber: reschedulePolicy === 'no_call' ? rescheduleCallNumber : '',
+      cancelPolicy,
+      cancelAmount: cancelPolicy === 'yes' ? cancelAmount : 0,
+      cancelUnit,
+      cancelCallNumber: cancelPolicy === 'no_call' ? cancelCallNumber : '',
       alerts: {
         enabled: alertEnabled,
-        recipients: alertEnabled ? alertRecipients : [],
+        alertUsers: alertEnabled ? alertUsers : [],
         triggers: alertEnabled ? alertTriggers : [],
       },
     };
@@ -150,7 +174,6 @@ export default function CreatePage() {
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-8">
-      {/* Header */}
       <div className="mb-8">
         <button
           onClick={() => router.push('/')}
@@ -165,52 +188,43 @@ export default function CreatePage() {
       </div>
 
       <div className="space-y-8">
-        {/* Q1: Select Calendar + Q2: Appointment Types */}
+
+        {/* ── 1. Details ── */}
         <section className="bg-white border border-gray-200 rounded-lg p-6">
           <div className="flex items-start gap-3 mb-4">
             <SectionNumber n={1} />
-            <div>
-              <h2 className="text-base font-semibold text-gray-900">Details</h2>
-            </div>
+            <h2 className="text-base font-semibold text-gray-900">Details</h2>
           </div>
           <div className="ml-11 space-y-5">
             <div className="space-y-1.5">
               <label className="block text-sm font-medium text-gray-700">Select Calendar Account</label>
-              <div className="relative">
-                <select
-                  value={calendarId}
-                  onChange={e => { setCalendarId(e.target.value); setAppointmentTypes([]); }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="" disabled>Choose a calendar account</option>
-                  {CALENDARS.map(cal => (
-                    <option key={cal.id} value={cal.id}>{cal.name}</option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                  <svg className="h-4 w-4 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
-                </div>
-              </div>
+              <StyledSelect
+                value={calendarId}
+                onChange={e => { setCalendarId(e.target.value); setAppointmentTypes([]); }}
+                className="w-full"
+              >
+                <option value="" disabled>Choose a calendar account</option>
+                {CALENDARS.map(cal => (
+                  <option key={cal.id} value={cal.id}>{cal.name}</option>
+                ))}
+              </StyledSelect>
             </div>
-
             {calendarId && (
               <TagInput
                 label="Which appointment types will this apply to?"
                 options={[
-                  { value: '__all__', label: 'All appointments' },
+                  { value: '__all__', label: 'All Appointments' },
                   ...(selectedCalendar?.appointmentTypes.map(t => ({ value: t, label: t })) || []),
                 ]}
                 selected={appointmentTypes}
                 onChange={setAppointmentTypes}
-                placeholder="All appointments"
+                placeholder="All Appointments"
               />
             )}
           </div>
         </section>
 
-        {/* Q2: Describe this appointment */}
+        {/* ── 2. Describe ── */}
         {calendarId && (
           <section className="bg-white border border-gray-200 rounded-lg p-6">
             <div className="flex items-start gap-3 mb-1">
@@ -227,66 +241,63 @@ export default function CreatePage() {
                 placeholder="e.g. This MRI/CT scan appointment is for patients who have been referred by their doctor. Patients must submit their referral letter in chat to book their appointment. Patients without a referral letter will be handed over to a human agent."
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y min-h-[100px]"
               />
-              <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1">
-                <span>{'\u{1F4A1}'}</span> Write like you&apos;re briefing a new receptionist
-              </p>
+              <div className="flex items-center justify-between mt-1.5">
+                <p className="text-xs text-gray-400 flex items-center gap-1">
+                  <span>{'\u{1F4A1}'}</span> Write like you&apos;re briefing a new receptionist
+                </p>
+                <button
+                  onClick={handleRewrite}
+                  disabled={!description.trim() || isRewriting}
+                  className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 disabled:text-gray-300 disabled:cursor-not-allowed"
+                >
+                  {isRewriting ? (
+                    <>
+                      <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Rewriting...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                      </svg>
+                      Rewrite with AI
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </section>
         )}
 
-        {/* Q3: Who can book? */}
+        {/* ── 3. Who can book ── */}
         {calendarId && (
           <section className="bg-white border border-gray-200 rounded-lg p-6">
             <div className="flex items-start gap-3 mb-1">
               <SectionNumber n={3} />
-              <div>
-                <h2 className="text-base font-semibold text-gray-900">Who can book this appointment?</h2>
-              </div>
+              <h2 className="text-base font-semibold text-gray-900">Who can book this appointment?</h2>
             </div>
             <div className="ml-11 mt-4 space-y-3">
-              <label
-                className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
-                  eligibility === 'anyone' ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="eligibility"
-                  checked={eligibility === 'anyone'}
-                  onChange={() => setEligibility('anyone')}
-                  className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                />
+              <label className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${eligibility === 'anyone' ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300'}`}>
+                <input type="radio" name="eligibility" checked={eligibility === 'anyone'} onChange={() => setEligibility('anyone')} className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
                 <span className="text-sm text-gray-700">Anyone</span>
               </label>
-
-              <label
-                className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
-                  eligibility === 'criteria' ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="eligibility"
-                  checked={eligibility === 'criteria'}
-                  onChange={() => setEligibility('criteria')}
-                  className="mt-0.5 w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                />
+              <label className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${eligibility === 'criteria' ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300'}`}>
+                <input type="radio" name="eligibility" checked={eligibility === 'criteria'} onChange={() => setEligibility('criteria')} className="mt-0.5 w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
                 <span className="text-sm text-gray-700">Patients who meet these criteria:</span>
               </label>
 
               {eligibility === 'criteria' && (
-                <div className="space-y-2 pl-2">
+                <div className="space-y-4 pl-2">
+                  <p className="text-xs text-gray-500">AI will check if patient meets this criteria during the conversation to determine if they are eligible to book</p>
                   {eligibilityCriteria.map((criterion, index) => (
                     <div key={index} className="flex items-center gap-2 p-2.5 bg-gray-50 rounded-lg">
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />
                       <span className="text-sm text-gray-700 flex-1">{criterion}</span>
-                      <button
-                        onClick={() => setEligibilityCriteria(prev => prev.filter((_, i) => i !== index))}
-                        className="text-gray-400 hover:text-red-500 flex-shrink-0"
-                      >
-                        <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                        </svg>
+                      <button onClick={() => setEligibilityCriteria(prev => prev.filter((_, i) => i !== index))} className="text-gray-400 hover:text-red-500 flex-shrink-0">
+                        <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
                       </button>
                     </div>
                   ))}
@@ -295,110 +306,161 @@ export default function CreatePage() {
                       type="text"
                       value={newCriterion}
                       onChange={e => setNewCriterion(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter' && newCriterion.trim()) {
-                          e.preventDefault();
-                          setEligibilityCriteria(prev => [...prev, newCriterion.trim()]);
-                          setNewCriterion('');
-                        }
-                      }}
+                      onKeyDown={e => { if (e.key === 'Enter' && newCriterion.trim()) { e.preventDefault(); setEligibilityCriteria(prev => [...prev, newCriterion.trim()]); setNewCriterion(''); } }}
                       placeholder="e.g. Patient must have a doctor referral"
                       className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
-                    <Button
-                      size="sm"
-                      disabled={!newCriterion.trim()}
-                      onClick={() => {
-                        if (newCriterion.trim()) {
-                          setEligibilityCriteria(prev => [...prev, newCriterion.trim()]);
-                          setNewCriterion('');
-                        }
-                      }}
-                    >
-                      Add
-                    </Button>
+                    <Button size="sm" disabled={!newCriterion.trim()} onClick={() => { if (newCriterion.trim()) { setEligibilityCriteria(prev => [...prev, newCriterion.trim()]); setNewCriterion(''); } }}>Add</Button>
                   </div>
-                  <p className="text-xs text-gray-400 flex items-center gap-1">
-                    <span>{'\u{1F4A1}'}</span> The AI will check these criteria during the conversation
-                  </p>
+
+                  {/* What happens if not eligible */}
+                  <div className="border-t border-gray-100 pt-4 space-y-3">
+                    <p className="text-sm font-medium text-gray-700">What happens if the patient does not meet the criteria?</p>
+                    <label className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${ineligibleAction === 'handover' ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300'}`}>
+                      <input type="radio" name="ineligible" checked={ineligibleAction === 'handover'} onChange={() => setIneligibleAction('handover')} className="w-4 h-4 text-blue-600 border-gray-300" />
+                      <span className="text-sm text-gray-700">Handover to human immediately</span>
+                    </label>
+                    <label className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${ineligibleAction === 'inform_call' ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300'}`}>
+                      <input type="radio" name="ineligible" checked={ineligibleAction === 'inform_call'} onChange={() => setIneligibleAction('inform_call')} className="mt-0.5 w-4 h-4 text-blue-600 border-gray-300" />
+                      <span className="text-sm text-gray-700">Inform patient they are not eligible and end the conversation with option to call</span>
+                    </label>
+                    {ineligibleAction === 'inform_call' && (
+                      <div className="pl-7">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Phone number to call</label>
+                        <input type="tel" value={ineligibleCallNumber} onChange={e => setIneligibleCallNumber(e.target.value)} placeholder="+65 6123 4567" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
           </section>
         )}
 
-        {/* Q4: How should patients book? */}
+        {/* ── 4. How to book ── */}
         {calendarId && (
           <section className="bg-white border border-gray-200 rounded-lg p-6">
             <div className="flex items-start gap-3 mb-1">
               <SectionNumber n={4} />
               <div>
                 <h2 className="text-base font-semibold text-gray-900">How would you like patients to book?</h2>
-                <p className="text-sm text-gray-500 mt-0.5">{selectedCalendar?.name}{appointmentTypes.length > 0 ? ` \u00B7 ${appointmentTypes.join(', ')}` : ''}</p>
+                <p className="text-sm text-gray-500 mt-0.5">{getSubheader()}</p>
               </div>
             </div>
             <div className="ml-11 space-y-3 mt-4">
-              {BOOKING_METHODS.map(method => (
-                <label
-                  key={method.value}
-                  className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
-                    bookingMethod === method.value ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="bookingMethod"
-                    value={method.value}
-                    checked={bookingMethod === method.value}
-                    onChange={() => setBookingMethod(method.value)}
-                    className="mt-0.5 w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                  />
-                  <div>
-                    <span className="text-sm font-medium text-gray-900">{method.label}</span>
-                    <p className="text-xs text-gray-500 mt-0.5">{method.description}</p>
-                  </div>
-                </label>
-              ))}
+              {/* Direct */}
+              <label className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${bookingMethod === 'direct' ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300'}`}>
+                <input type="radio" name="bookingMethod" checked={bookingMethod === 'direct'} onChange={() => setBookingMethod('direct')} className="mt-0.5 w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
+                <div>
+                  <span className="text-sm font-medium text-gray-900">Scheduling AI to book directly</span>
+                  <p className="text-xs text-gray-500 mt-0.5">AI offers patient slots to choose from &rarr; Patient can select their preferred slot &rarr; Appointment is confirmed immediately</p>
+                </div>
+              </label>
 
-              {bookingMethod === 'link' && (
-                <div className="mt-3">
-                  <Input
-                    label="Scheduling link URL"
-                    placeholder="https://clinic.calendly.com/radiology"
-                    value={schedulingLink}
-                    onChange={e => setSchedulingLink(e.target.value)}
-                  />
+              {bookingMethod === 'direct' && (
+                <div className="ml-7 p-4 bg-gray-50 rounded-lg space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">How many slots to offer patient?</label>
+                    <StyledSelect value={directConfig.slotsToOffer} onChange={e => setDirectConfig(prev => ({ ...prev, slotsToOffer: Number(e.target.value) }))}>
+                      {[1, 2, 3, 4, 5].map(n => (
+                        <option key={n} value={n}>{n} appointment slot{n > 1 ? 's' : ''}</option>
+                      ))}
+                    </StyledSelect>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">How far in advance can patient book?</label>
+                    <div className="flex items-center gap-2">
+                      <input type="number" min={1} value={directConfig.advanceAmount} onChange={e => setDirectConfig(prev => ({ ...prev, advanceAmount: Number(e.target.value) }))} className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      <StyledSelect value={directConfig.advanceUnit} onChange={e => setDirectConfig(prev => ({ ...prev, advanceUnit: e.target.value as DirectBookingConfig['advanceUnit'] }))}>
+                        <option value="days">Days</option>
+                        <option value="weeks">Weeks</option>
+                        <option value="months">Months</option>
+                      </StyledSelect>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-700">If no slots are available within the selected window, what should the AI do?</p>
+                    <label className={`flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-colors ${directConfig.noSlotsAction === 'handover' ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300'}`}>
+                      <input type="radio" name="noSlots" checked={directConfig.noSlotsAction === 'handover'} onChange={() => setDirectConfig(prev => ({ ...prev, noSlotsAction: 'handover' as NoSlotsAction }))} className="w-4 h-4 text-blue-600 border-gray-300" />
+                      <span className="text-sm text-gray-700">Handover to human</span>
+                    </label>
+                    <label className={`flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-colors ${directConfig.noSlotsAction === 'inform' ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300'}`}>
+                      <input type="radio" name="noSlots" checked={directConfig.noSlotsAction === 'inform'} onChange={() => setDirectConfig(prev => ({ ...prev, noSlotsAction: 'inform' as NoSlotsAction }))} className="w-4 h-4 text-blue-600 border-gray-300" />
+                      <span className="text-sm text-gray-700">Inform patient no slots are available</span>
+                    </label>
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-700">If patient indicates that none of the slots are suitable, what should the AI do?</p>
+                    <label className={`flex items-start gap-3 p-2.5 border rounded-lg cursor-pointer transition-colors ${directConfig.noSuitableAction === 'offer_next' ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300'}`}>
+                      <input type="radio" name="noSuitable" checked={directConfig.noSuitableAction === 'offer_next'} onChange={() => setDirectConfig(prev => ({ ...prev, noSuitableAction: 'offer_next' as NoSuitableAction }))} className="mt-0.5 w-4 h-4 text-blue-600 border-gray-300" />
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm text-gray-700">Offer the next set of appointment slots within the appointment window. Maximum tries</span>
+                        <input type="number" min={1} max={10} value={directConfig.maxRetries} onChange={e => setDirectConfig(prev => ({ ...prev, maxRetries: Number(e.target.value) }))} className="w-16 px-2 py-1 border border-gray-300 rounded text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        <span className="text-sm text-gray-700">times after which handover to human</span>
+                      </div>
+                    </label>
+                    <label className={`flex items-center gap-3 p-2.5 border rounded-lg cursor-pointer transition-colors ${directConfig.noSuitableAction === 'handover' ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300'}`}>
+                      <input type="radio" name="noSuitable" checked={directConfig.noSuitableAction === 'handover'} onChange={() => setDirectConfig(prev => ({ ...prev, noSuitableAction: 'handover' as NoSuitableAction }))} className="w-4 h-4 text-blue-600 border-gray-300" />
+                      <span className="text-sm text-gray-700">Handover to human immediately</span>
+                    </label>
+                  </div>
                 </div>
               )}
 
+              {/* Link */}
+              <label className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${bookingMethod === 'link' ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300'}`}>
+                <input type="radio" name="bookingMethod" checked={bookingMethod === 'link'} onChange={() => setBookingMethod('link')} className="mt-0.5 w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
+                <div>
+                  <span className="text-sm font-medium text-gray-900">Send scheduling link</span>
+                  <p className="text-xs text-gray-500 mt-0.5">AI returns scheduling link to booking portal</p>
+                </div>
+              </label>
+
+              {bookingMethod === 'link' && (
+                <div className="ml-7 p-4 bg-gray-50 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Scheduling link URL</label>
+                  <input
+                    type="text"
+                    value="Will be generated by backend"
+                    disabled
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-400 bg-gray-100 cursor-not-allowed"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">This link will be automatically generated</p>
+                </div>
+              )}
+
+              {/* Request */}
+              <label className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${bookingMethod === 'request' ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300'}`}>
+                <input type="radio" name="bookingMethod" checked={bookingMethod === 'request'} onChange={() => setBookingMethod('request')} className="mt-0.5 w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
+                <div>
+                  <span className="text-sm font-medium text-gray-900">Request preferred date and time</span>
+                  <p className="text-xs text-gray-500 mt-0.5">e.g. Preferred Date, Preferred Time: AM/PM</p>
+                </div>
+              </label>
+
               {bookingMethod === 'request' && (
-                <div className="mt-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    How many options to collect?
-                  </label>
-                  <select
-                    value={preferredSlotsCount}
-                    onChange={e => setPreferredSlotsCount(Number(e.target.value))}
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
+                <div className="ml-7 p-4 bg-gray-50 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">How many preferred date &amp; time options to collect?</label>
+                  <StyledSelect value={preferredSlotsCount} onChange={e => setPreferredSlotsCount(Number(e.target.value))}>
                     {[1, 2, 3, 4, 5].map(n => (
                       <option key={n} value={n}>{n}</option>
                     ))}
-                  </select>
+                  </StyledSelect>
                 </div>
               )}
             </div>
           </section>
         )}
 
-        {/* Q4: What information to collect? */}
+        {/* ── 5. Information to collect ── */}
         {calendarId && (
           <section className="bg-white border border-gray-200 rounded-lg p-6">
             <div className="flex items-start gap-3 mb-1">
               <SectionNumber n={5} />
-              <div>
-                <h2 className="text-base font-semibold text-gray-900">What information do we need to collect from the patient?</h2>
-              </div>
+              <h2 className="text-base font-semibold text-gray-900">What information do we need to collect from the patient?</h2>
             </div>
             <div className="ml-11 mt-4 space-y-4">
               <TagInput
@@ -408,7 +470,6 @@ export default function CreatePage() {
                 placeholder="Select properties..."
                 hint="Select from your Contact Properties"
               />
-
               {selectedFields.length > 0 && (
                 <div className="border border-gray-200 rounded-lg overflow-hidden">
                   <div className="grid grid-cols-[1fr,80px] gap-2 px-4 py-2 bg-gray-50 border-b border-gray-200">
@@ -419,145 +480,139 @@ export default function CreatePage() {
                     <div key={field.propertyId} className="grid grid-cols-[1fr,80px] gap-2 px-4 py-2.5 border-b border-gray-100 last:border-0">
                       <span className="text-sm text-gray-700">{field.label}</span>
                       <div className="flex justify-center">
-                        <input
-                          type="checkbox"
-                          checked={field.required}
-                          onChange={() => toggleRequired(field.propertyId)}
-                          className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                      </div>
-                    </div>
-                  ))}
-                  {customFields.map(field => (
-                    <div key={field.id} className="grid grid-cols-[1fr,80px] gap-2 px-4 py-2.5 border-b border-gray-100 last:border-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-700">{field.label}</span>
-                        <span className="text-xs text-gray-400">({field.type})</span>
-                        <button
-                          onClick={() => setCustomFields(prev => prev.filter(f => f.id !== field.id))}
-                          className="text-gray-400 hover:text-red-500 ml-auto"
-                        >
-                          <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                          </svg>
-                        </button>
-                      </div>
-                      <div className="flex justify-center">
-                        <input
-                          type="checkbox"
-                          checked={field.required}
-                          onChange={() => setCustomFields(prev => prev.map(f => f.id === field.id ? { ...f, required: !f.required } : f))}
-                          className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
+                        <input type="checkbox" checked={field.required} onChange={() => toggleRequired(field.propertyId)} className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                       </div>
                     </div>
                   ))}
                 </div>
               )}
+              <p className="text-xs text-gray-500">
+                You can set up patient properties in{' '}
+                <a href="https://dashboard.botmd.io/contacts" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 font-medium">
+                  Contacts
+                </a>{' '}
+                module
+              </p>
+            </div>
+          </section>
+        )}
 
-              {showCustomField ? (
-                <div className="border border-gray-200 rounded-lg p-4 space-y-3">
-                  <h3 className="text-sm font-medium text-gray-900">Add Custom Field</h3>
-                  <Input label="Field name" placeholder="e.g. Type of exam" value={cfName} onChange={e => setCfName(e.target.value)} />
-                  <div>
-                    <p className="text-sm font-medium text-gray-700 mb-2">Type</p>
-                    <div className="flex gap-4">
-                      {(['text', 'number', 'yes_no', 'select'] as const).map(t => (
-                        <label key={t} className="flex items-center gap-1.5 cursor-pointer">
-                          <input type="radio" name="cfType" checked={cfType === t} onChange={() => setCfType(t)} className="w-4 h-4 text-blue-600" />
-                          <span className="text-sm text-gray-700">{t === 'yes_no' ? 'Yes/No' : t.charAt(0).toUpperCase() + t.slice(1)}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setShowCustomField(false)}>Cancel</Button>
-                    <Button size="sm" onClick={addCustomField} disabled={!cfName.trim()}>Add Field</Button>
-                  </div>
+        {/* ── 6. Reschedule ── */}
+        {calendarId && (
+          <section className="bg-white border border-gray-200 rounded-lg p-6">
+            <div className="flex items-start gap-3 mb-1">
+              <SectionNumber n={6} />
+              <h2 className="text-base font-semibold text-gray-900">Allow patient to reschedule appointment?</h2>
+            </div>
+            <div className="ml-11 mt-4 space-y-3">
+              <label className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${reschedulePolicy === 'yes' ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300'}`}>
+                <input type="radio" name="reschedule" checked={reschedulePolicy === 'yes'} onChange={() => setReschedulePolicy('yes')} className="mt-0.5 w-4 h-4 text-blue-600 border-gray-300" />
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm text-gray-700">Yes, rescheduling is permitted up to</span>
+                  <input type="number" min={1} value={rescheduleAmount} onChange={e => setRescheduleAmount(Number(e.target.value))} className="w-16 px-2 py-1 border border-gray-300 rounded text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <StyledSelect value={rescheduleUnit} onChange={e => setRescheduleUnit(e.target.value as typeof rescheduleUnit)}>
+                    <option value="hours">Hours</option>
+                    <option value="days">Days</option>
+                    <option value="weeks">Weeks</option>
+                    <option value="months">Months</option>
+                  </StyledSelect>
+                  <span className="text-sm text-gray-700">before appointment date</span>
                 </div>
-              ) : (
-                <button onClick={() => setShowCustomField(true)} className="text-sm text-blue-600 hover:text-blue-700 font-medium">
-                  + Add custom field
-                </button>
+              </label>
+              <label className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${reschedulePolicy === 'no_handover' ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300'}`}>
+                <input type="radio" name="reschedule" checked={reschedulePolicy === 'no_handover'} onChange={() => setReschedulePolicy('no_handover')} className="w-4 h-4 text-blue-600 border-gray-300" />
+                <span className="text-sm text-gray-700">No, rescheduling is not permitted, handover to human</span>
+              </label>
+              <label className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${reschedulePolicy === 'no_call' ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300'}`}>
+                <input type="radio" name="reschedule" checked={reschedulePolicy === 'no_call'} onChange={() => setReschedulePolicy('no_call')} className="mt-0.5 w-4 h-4 text-blue-600 border-gray-300" />
+                <span className="text-sm text-gray-700">No, rescheduling is not permitted, ask patient to call to reschedule</span>
+              </label>
+              {reschedulePolicy === 'no_call' && (
+                <div className="pl-7">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Number to call</label>
+                  <input type="tel" value={rescheduleCallNumber} onChange={e => setRescheduleCallNumber(e.target.value)} placeholder="+65 6123 4567" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
               )}
             </div>
           </section>
         )}
 
-        {/* Q5: Handover rules */}
+        {/* ── 7. Cancel ── */}
         {calendarId && (
           <section className="bg-white border border-gray-200 rounded-lg p-6">
             <div className="flex items-start gap-3 mb-1">
-              <SectionNumber n={6} />
-              <div>
-                <h2 className="text-base font-semibold text-gray-900">Are there any situations where we should handover to a human agent?</h2>
-              </div>
+              <SectionNumber n={7} />
+              <h2 className="text-base font-semibold text-gray-900">Allow patient to cancel appointment?</h2>
             </div>
-            <div className="ml-11 mt-4 space-y-4">
-              <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors border-gray-200 hover:border-gray-300">
-                <input
-                  type="radio"
-                  name="handover"
-                  checked={!handoverEnabled}
-                  onChange={() => setHandoverEnabled(false)}
-                  className="w-4 h-4 text-blue-600 border-gray-300"
-                />
-                <span className="text-sm text-gray-700">No, the AI can handle all bookings</span>
+            <div className="ml-11 mt-4 space-y-3">
+              <label className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${cancelPolicy === 'yes' ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300'}`}>
+                <input type="radio" name="cancel" checked={cancelPolicy === 'yes'} onChange={() => setCancelPolicy('yes')} className="mt-0.5 w-4 h-4 text-blue-600 border-gray-300" />
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm text-gray-700">Yes, cancellation is permitted up to</span>
+                  <input type="number" min={1} value={cancelAmount} onChange={e => setCancelAmount(Number(e.target.value))} className="w-16 px-2 py-1 border border-gray-300 rounded text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <StyledSelect value={cancelUnit} onChange={e => setCancelUnit(e.target.value as typeof cancelUnit)}>
+                    <option value="hours">Hours</option>
+                    <option value="days">Days</option>
+                    <option value="weeks">Weeks</option>
+                    <option value="months">Months</option>
+                  </StyledSelect>
+                  <span className="text-sm text-gray-700">before appointment date</span>
+                </div>
+              </label>
+              <label className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${cancelPolicy === 'no_handover' ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300'}`}>
+                <input type="radio" name="cancel" checked={cancelPolicy === 'no_handover'} onChange={() => setCancelPolicy('no_handover')} className="w-4 h-4 text-blue-600 border-gray-300" />
+                <span className="text-sm text-gray-700">Cancellation is NOT permitted, handover to human</span>
+              </label>
+              <label className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${cancelPolicy === 'no_call' ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300'}`}>
+                <input type="radio" name="cancel" checked={cancelPolicy === 'no_call'} onChange={() => setCancelPolicy('no_call')} className="mt-0.5 w-4 h-4 text-blue-600 border-gray-300" />
+                <span className="text-sm text-gray-700">Cancellation is NOT permitted, ask patient to call to cancel</span>
+              </label>
+              {cancelPolicy === 'no_call' && (
+                <div className="pl-7">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Number to call</label>
+                  <input type="tel" value={cancelCallNumber} onChange={e => setCancelCallNumber(e.target.value)} placeholder="+65 6123 4567" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* ── 8. Alerts ── */}
+        {calendarId && (
+          <section className="bg-white border border-gray-200 rounded-lg p-6">
+            <div className="flex items-start gap-3 mb-1">
+              <SectionNumber n={8} />
+              <h2 className="text-base font-semibold text-gray-900">Do we need to alert anyone for patient scheduling/rescheduling/cancellation?</h2>
+            </div>
+            <div className="ml-11 mt-4 space-y-3">
+              <label className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${!alertEnabled ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300'}`}>
+                <input type="radio" name="alerts" checked={!alertEnabled} onChange={() => setAlertEnabled(false)} className="w-4 h-4 text-blue-600 border-gray-300" />
+                <span className="text-sm text-gray-700">No alerts needed</span>
+              </label>
+              <label className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${alertEnabled ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300'}`}>
+                <input type="radio" name="alerts" checked={alertEnabled} onChange={() => setAlertEnabled(true)} className="mt-0.5 w-4 h-4 text-blue-600 border-gray-300" />
+                <span className="text-sm text-gray-700">Alert</span>
               </label>
 
-              <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors border-gray-200 hover:border-gray-300">
-                <input
-                  type="radio"
-                  name="handover"
-                  checked={handoverEnabled}
-                  onChange={() => setHandoverEnabled(true)}
-                  className="w-4 h-4 text-blue-600 border-gray-300"
-                />
-                <span className="text-sm text-gray-700">Yes, handover if:</span>
-              </label>
-
-              {handoverEnabled && (
-                <div className="space-y-3 pl-2">
-                  {handoverRules.map(rule => (
-                    <div key={rule.id} className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-                      <span className="text-sm text-gray-700 flex-shrink-0">Handover if patient</span>
-                      <select
-                        value={rule.condition}
-                        onChange={e => {
-                          const newCond = e.target.value;
-                          const firstVal = HANDOVER_VALUES[newCond]?.[0]?.value || '';
-                          updateHandoverRule(rule.id, { condition: newCond, value: firstVal });
-                        }}
-                        className="px-2 py-1.5 border border-gray-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        {HANDOVER_CONDITIONS.map(c => (
-                          <option key={c.value} value={c.value}>{c.label}</option>
-                        ))}
-                      </select>
-                      <select
-                        value={rule.value}
-                        onChange={e => updateHandoverRule(rule.id, { value: e.target.value })}
-                        className="px-2 py-1.5 border border-gray-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        {(HANDOVER_VALUES[rule.condition] || []).map(v => (
-                          <option key={v.value} value={v.value}>{v.label}</option>
-                        ))}
-                      </select>
-                      <button
-                        onClick={() => removeHandoverRule(rule.id)}
-                        className="text-gray-400 hover:text-red-500 flex-shrink-0 ml-auto"
-                      >
-                        <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                        </svg>
-                      </button>
-                    </div>
-                  ))}
-                  <button onClick={addHandoverRule} className="text-sm text-blue-600 hover:text-blue-700 font-medium">
-                    + Add another handover rule
-                  </button>
-                  <p className="text-xs text-gray-400 flex items-center gap-1">
-                    <span>{'\u{1F4A1}'}</span> The AI will detect these from the patient&apos;s responses
+              {alertEnabled && (
+                <div className="space-y-4 pl-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Who to alert</label>
+                    <TagInput
+                      options={ADMIN_USERS.map(u => ({ value: u.id, label: u.name }))}
+                      selected={alertUsers}
+                      onChange={setAlertUsers}
+                      placeholder="Select users..."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-700">When should we send alerts?</p>
+                    {ALERT_TRIGGERS.map(trigger => (
+                      <Checkbox key={trigger.id} label={trigger.label} checked={alertTriggers.includes(trigger.id)} onChange={() => toggleAlertTrigger(trigger.id)} />
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500 flex items-center gap-1">
+                    <span>{'\u{1F4A1}'}</span> Patient handover requests will always alert users
                   </p>
                 </div>
               )}
@@ -565,127 +620,11 @@ export default function CreatePage() {
           </section>
         )}
 
-        {/* Q6: Alerts */}
+        {/* ── Save ── */}
         {calendarId && (
-          <section className="bg-white border border-gray-200 rounded-lg p-6">
-            <div className="flex items-start gap-3 mb-1">
-              <SectionNumber n={7} />
-              <div>
-                <h2 className="text-base font-semibold text-gray-900">Who should we alert when a patient books?</h2>
-              </div>
-            </div>
-            <div className="ml-11 mt-4 space-y-4">
-              <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors border-gray-200 hover:border-gray-300">
-                <input
-                  type="radio"
-                  name="alerts"
-                  checked={!alertEnabled}
-                  onChange={() => setAlertEnabled(false)}
-                  className="w-4 h-4 text-blue-600 border-gray-300"
-                />
-                <span className="text-sm text-gray-700">No alerts needed</span>
-              </label>
-
-              <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors border-gray-200 hover:border-gray-300">
-                <input
-                  type="radio"
-                  name="alerts"
-                  checked={alertEnabled}
-                  onChange={() => setAlertEnabled(true)}
-                  className="w-4 h-4 text-blue-600 border-gray-300"
-                />
-                <span className="text-sm text-gray-700">Alert someone:</span>
-              </label>
-
-              {alertEnabled && (
-                <div className="space-y-4 pl-2">
-                  {alertRecipients.map((recipient, index) => (
-                    <div key={index} className="p-4 bg-gray-50 rounded-lg space-y-3">
-                      <Input
-                        label="Alert"
-                        placeholder="e.g. Radiology Reception"
-                        value={recipient.name}
-                        onChange={e => updateRecipient(index, { name: e.target.value })}
-                      />
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium text-gray-700">via</p>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <Checkbox
-                              label="Email"
-                              checked={recipient.email !== ''}
-                              onChange={checked => updateRecipient(index, { email: checked ? ' ' : '' })}
-                            />
-                            {recipient.email !== '' && (
-                              <input
-                                type="email"
-                                placeholder="email@clinic.com"
-                                value={recipient.email.trim()}
-                                onChange={e => updateRecipient(index, { email: e.target.value || ' ' })}
-                                className="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              />
-                            )}
-                          </div>
-                          <div className="space-y-1">
-                            <Checkbox
-                              label="WhatsApp"
-                              checked={recipient.whatsapp !== ''}
-                              onChange={checked => updateRecipient(index, { whatsapp: checked ? ' ' : '' })}
-                            />
-                            {recipient.whatsapp !== '' && (
-                              <input
-                                type="tel"
-                                placeholder="+65 9123 4567"
-                                value={recipient.whatsapp.trim()}
-                                onChange={e => updateRecipient(index, { whatsapp: e.target.value || ' ' })}
-                                className="w-full px-2.5 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              />
-                            )}
-                          </div>
-                          <div>
-                            <Checkbox
-                              label="Viber"
-                              checked={recipient.viber !== ''}
-                              onChange={checked => updateRecipient(index, { viber: checked ? ' ' : '' })}
-                            />
-                          </div>
-                          <div>
-                            <Checkbox
-                              label="SMS"
-                              checked={recipient.sms !== ''}
-                              onChange={checked => updateRecipient(index, { sms: checked ? ' ' : '' })}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-
-                  <div className="border-t border-gray-100 pt-4 space-y-2">
-                    <p className="text-sm font-medium text-gray-700">When should we send alerts?</p>
-                    {ALERT_TRIGGERS.map(trigger => (
-                      <Checkbox
-                        key={trigger.id}
-                        label={trigger.label}
-                        checked={alertTriggers.includes(trigger.id)}
-                        onChange={() => toggleAlertTrigger(trigger.id)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </section>
-        )}
-
-        {/* Actions */}
-        {calendarId && (
-          <div className="flex items-center justify-end gap-3 pb-8">
-            <Button variant="outline" onClick={() => handleSave('draft')}>
-              Save Draft
-            </Button>
-            <Button onClick={() => handleSave('active')} disabled={!calendarId}>
-              Activate {'\u2713'}
+          <div className="flex items-center justify-end pb-8">
+            <Button onClick={handleSave} disabled={!calendarId}>
+              Save Setting
             </Button>
           </div>
         )}

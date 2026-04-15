@@ -48,66 +48,16 @@ export const CALENDARS: Calendar[] = [
   },
 ];
 
-export const BOOKING_METHODS = [
-  {
-    value: 'direct' as const,
-    label: 'Direct booking with AI',
-    description: 'Patient selects a slot \u2192 confirmed immediately',
-  },
-  {
-    value: 'link' as const,
-    label: 'Send scheduling link',
-    description: 'AI sends a link (Calendly, etc.) \u2192 patient books there',
-  },
-  {
-    value: 'request' as const,
-    label: 'Request preferred date and time',
-    description: 'Patient submits preferences \u2192 admin confirms',
-  },
+export const ADMIN_USERS = [
+  { id: 'all', name: 'All Users' },
+  { id: 'admin_1', name: 'Dr. Smith' },
+  { id: 'admin_2', name: 'Nurse Ana' },
+  { id: 'admin_3', name: 'Reception Desk' },
+  { id: 'admin_4', name: 'Radiology Team' },
+  { id: 'admin_5', name: 'Wellness Team' },
 ];
-
-export const HANDOVER_CONDITIONS = [
-  { value: 'is', label: 'is an' },
-  { value: 'requires', label: 'requires' },
-  { value: 'mentions', label: 'mentions' },
-  { value: 'doesnt_know', label: "doesn't know" },
-  { value: 'has', label: 'has' },
-];
-
-export const HANDOVER_VALUES: Record<string, { value: string; label: string }[]> = {
-  is: [
-    { value: 'hmo_patient', label: 'HMO patient' },
-    { value: 'private_patient', label: 'private patient' },
-    { value: 'new_patient', label: 'new patient' },
-    { value: 'existing_patient', label: 'existing patient' },
-  ],
-  requires: [
-    { value: 'additional_tests', label: 'additional tests' },
-    { value: 'contrast', label: 'contrast' },
-    { value: 'sedation', label: 'sedation' },
-    { value: 'special_preparation', label: 'special preparation' },
-  ],
-  mentions: [
-    { value: 'emergency', label: 'emergency' },
-    { value: 'urgent', label: 'urgent' },
-    { value: 'pain', label: 'pain' },
-    { value: 'bleeding', label: 'bleeding' },
-  ],
-  doesnt_know: [
-    { value: 'exam_type', label: 'exam type' },
-    { value: 'date_preference', label: 'date preference' },
-    { value: 'insurance_details', label: 'insurance details' },
-  ],
-  has: [
-    { value: 'allergy', label: 'allergy' },
-    { value: 'pacemaker', label: 'pacemaker' },
-    { value: 'implant', label: 'implant' },
-  ],
-};
 
 export const ALERT_TRIGGERS = [
   { id: 'new_booking', label: 'New booking request received' },
-  { id: 'handover', label: 'Patient handed over to human' },
   { id: 'cancel_reschedule', label: 'Patient cancels or reschedules' },
-  { id: 'daily_summary', label: 'Daily summary' },
 ];

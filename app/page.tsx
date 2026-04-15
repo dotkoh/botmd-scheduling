@@ -10,7 +10,6 @@ export default function Dashboard() {
   const { rules } = useStore();
 
   const active = rules.filter(r => r.status === 'active').length;
-  const paused = rules.filter(r => r.status === 'paused').length;
   const draft = rules.filter(r => r.status === 'draft').length;
 
   return (
@@ -32,7 +31,6 @@ export default function Dashboard() {
           <span>{rules.length} rule{rules.length !== 1 ? 's' : ''}</span>
           <span className="text-gray-300">|</span>
           <span className="text-green-600">{active} active</span>
-          {paused > 0 && <span className="text-yellow-600">{paused} paused</span>}
           {draft > 0 && <span className="text-gray-400">{draft} draft</span>}
         </div>
       )}
