@@ -12,6 +12,7 @@ import {
 import Button from '@/components/ui/Button';
 import Checkbox from '@/components/ui/Checkbox';
 import TagInput from '@/components/ui/TagInput';
+import PhoneInput from '@/components/ui/PhoneInput';
 
 function SectionNumber({ n }: { n: number }) {
   return (
@@ -93,6 +94,28 @@ export default function CreatePage() {
     group: p.isDefault ? 'DEFAULT PROPERTIES' : 'CUSTOM PROPERTIES',
   }));
 
+  // Appointment types: if "__all__" is selected, clear others
+  function handleAppointmentTypesChange(selected: string[]) {
+    if (selected.includes('__all__') && !appointmentTypes.includes('__all__')) {
+      setAppointmentTypes(['__all__']);
+    } else if (selected.length > 1 && selected.includes('__all__')) {
+      setAppointmentTypes(selected.filter(s => s !== '__all__'));
+    } else {
+      setAppointmentTypes(selected);
+    }
+  }
+
+  // Alert users: if "all" is selected, clear others
+  function handleAlertUsersChange(selected: string[]) {
+    if (selected.includes('all') && !alertUsers.includes('all')) {
+      setAlertUsers(['all']);
+    } else if (selected.length > 1 && selected.includes('all')) {
+      setAlertUsers(selected.filter(s => s !== 'all'));
+    } else {
+      setAlertUsers(selected);
+    }
+  }
+
   function handlePropertyChange(selected: string[]) {
     const newFields: FieldConfig[] = selected.map(id => {
       const existing = selectedFields.find(f => f.propertyId === id);
@@ -129,7 +152,7 @@ export default function CreatePage() {
   function getSubheader() {
     const cal = selectedCalendar?.name || '';
     const types = appointmentTypes.length > 0
-      ? appointmentTypes.map(t => t.includes('__all__') ? 'All Appointments' : t).join(', ')
+      ? appointmentTypes.map(t => t === '__all__' ? 'All Appointments' : t).join(', ')
       : 'All Appointments';
     return `${cal} | ${types}`;
   }
@@ -214,10 +237,10 @@ export default function CreatePage() {
                 label="Which appointment types will this apply to?"
                 options={[
                   { value: '__all__', label: 'All Appointments' },
-                  ...(selectedCalendar?.appointmentTypes.map(t => ({ value: t, label: t })) || []),
+                  ...(appointmentTypes.includes('__all__') ? [] : (selectedCalendar?.appointmentTypes.map(t => ({ value: t, label: t })) || [])),
                 ]}
                 selected={appointmentTypes}
-                onChange={setAppointmentTypes}
+                onChange={handleAppointmentTypesChange}
                 placeholder="All Appointments"
               />
             )}
@@ -313,7 +336,6 @@ export default function CreatePage() {
                     <Button size="sm" disabled={!newCriterion.trim()} onClick={() => { if (newCriterion.trim()) { setEligibilityCriteria(prev => [...prev, newCriterion.trim()]); setNewCriterion(''); } }}>Add</Button>
                   </div>
 
-                  {/* What happens if not eligible */}
                   <div className="border-t border-gray-100 pt-4 space-y-3">
                     <p className="text-sm font-medium text-gray-700">What happens if the patient does not meet the criteria?</p>
                     <label className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${ineligibleAction === 'handover' ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300'}`}>
@@ -326,8 +348,7 @@ export default function CreatePage() {
                     </label>
                     {ineligibleAction === 'inform_call' && (
                       <div className="pl-7">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Phone number to call</label>
-                        <input type="tel" value={ineligibleCallNumber} onChange={e => setIneligibleCallNumber(e.target.value)} placeholder="+65 6123 4567" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        <PhoneInput label="Phone number to call" value={ineligibleCallNumber} onChange={setIneligibleCallNumber} />
                       </div>
                     )}
                   </div>
@@ -468,7 +489,6 @@ export default function CreatePage() {
                 selected={selectedFields.map(f => f.propertyId)}
                 onChange={handlePropertyChange}
                 placeholder="Select properties..."
-                hint="Select from your Contact Properties"
               />
               {selectedFields.length > 0 && (
                 <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -487,11 +507,10 @@ export default function CreatePage() {
                 </div>
               )}
               <p className="text-xs text-gray-500">
-                You can set up patient properties in{' '}
+                Select from patient properties. You can set them up in{' '}
                 <a href="https://dashboard.botmd.io/contacts" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 font-medium">
-                  Contacts
-                </a>{' '}
-                module
+                  Contacts module
+                </a>
               </p>
             </div>
           </section>
@@ -529,8 +548,7 @@ export default function CreatePage() {
               </label>
               {reschedulePolicy === 'no_call' && (
                 <div className="pl-7">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Number to call</label>
-                  <input type="tel" value={rescheduleCallNumber} onChange={e => setRescheduleCallNumber(e.target.value)} placeholder="+65 6123 4567" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <PhoneInput label="Number to call" value={rescheduleCallNumber} onChange={setRescheduleCallNumber} />
                 </div>
               )}
             </div>
@@ -569,8 +587,7 @@ export default function CreatePage() {
               </label>
               {cancelPolicy === 'no_call' && (
                 <div className="pl-7">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Number to call</label>
-                  <input type="tel" value={cancelCallNumber} onChange={e => setCancelCallNumber(e.target.value)} placeholder="+65 6123 4567" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <PhoneInput label="Number to call" value={cancelCallNumber} onChange={setCancelCallNumber} />
                 </div>
               )}
             </div>
@@ -582,7 +599,7 @@ export default function CreatePage() {
           <section className="bg-white border border-gray-200 rounded-lg p-6">
             <div className="flex items-start gap-3 mb-1">
               <SectionNumber n={8} />
-              <h2 className="text-base font-semibold text-gray-900">Do we need to alert anyone for patient scheduling/rescheduling/cancellation?</h2>
+              <h2 className="text-base font-semibold text-gray-900">Do we need to alert anyone for bookings?</h2>
             </div>
             <div className="ml-11 mt-4 space-y-3">
               <label className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${!alertEnabled ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300'}`}>
@@ -591,25 +608,29 @@ export default function CreatePage() {
               </label>
               <label className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${alertEnabled ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300'}`}>
                 <input type="radio" name="alerts" checked={alertEnabled} onChange={() => setAlertEnabled(true)} className="mt-0.5 w-4 h-4 text-blue-600 border-gray-300" />
-                <span className="text-sm text-gray-700">Alert</span>
+                <span className="text-sm text-gray-700">Alert these users</span>
               </label>
 
               {alertEnabled && (
                 <div className="space-y-4 pl-2">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Who to alert</label>
-                    <TagInput
-                      options={ADMIN_USERS.map(u => ({ value: u.id, label: u.name }))}
-                      selected={alertUsers}
-                      onChange={setAlertUsers}
-                      placeholder="Select users..."
-                    />
-                  </div>
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-gray-700">When should we send alerts?</p>
                     {ALERT_TRIGGERS.map(trigger => (
                       <Checkbox key={trigger.id} label={trigger.label} checked={alertTriggers.includes(trigger.id)} onChange={() => toggleAlertTrigger(trigger.id)} />
                     ))}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Who to alert</label>
+                    <TagInput
+                      options={
+                        alertUsers.includes('all')
+                          ? []
+                          : ADMIN_USERS.map(u => ({ value: u.id, label: u.name, group: 'Select user' }))
+                      }
+                      selected={alertUsers}
+                      onChange={handleAlertUsersChange}
+                      placeholder="Select users..."
+                    />
                   </div>
                   <p className="text-xs text-gray-500 flex items-center gap-1">
                     <span>{'\u{1F4A1}'}</span> Patient handover requests will always alert users
